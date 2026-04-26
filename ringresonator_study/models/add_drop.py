@@ -11,61 +11,9 @@ import cmath
 import math
 from typing import Iterable
 
-
-@dataclass(frozen=True)
-class Coupler:
-    """Directional coupler field coefficients.
-
-    Args:
-        t: Through/self-coupling field coefficient.
-        kappa: Cross-coupling field coefficient.
-
-    For an ideal lossless coupler, ``abs(t)**2 + abs(kappa)**2 == 1``.
-    The model can still be used with non-ideal effective coefficients, but
-    ``validate_lossless`` is useful when checking simple textbook examples.
-    """
-
-    t: complex
-    kappa: complex
-
-    @property
-    def through_power(self) -> float:
-        return abs(self.t) ** 2
-
-    @property
-    def cross_power(self) -> float:
-        return abs(self.kappa) ** 2
-
-    def validate_lossless(self, *, tolerance: float = 1e-12) -> None:
-        total = self.through_power + self.cross_power
-        if not math.isclose(total, 1.0, rel_tol=tolerance, abs_tol=tolerance):
-            raise ValueError(
-                "lossless coupler requires abs(t)**2 + abs(kappa)**2 == 1; "
-                f"got {total:.16g}"
-            )
-
-
-@dataclass(frozen=True)
-class PortResponse:
-    """Complex field response plus derived power and phase."""
-
-    amplitude: complex
-
-    @property
-    def power(self) -> float:
-        """Optical power transmission for unit input power."""
-
-        return abs(self.amplitude) ** 2
-
-    @property
-    def phase(self) -> float:
-        """Optical phase in radians, returned as the principal value."""
-
-        return math.atan2(self.amplitude.imag, self.amplitude.real)
-
-    @property
-    def phase_degrees(self) -> float:
-        return math.degrees(self.phase)
+from ringresonator_study.components import Coupler
+from ringresonator_study.phase import round_trip_phase
+from ringresonator_study.responses import AddDropResponse, PortResponse
 
 
 @dataclass(frozen=True)
@@ -96,13 +44,7 @@ class AddDropRing:
         """Return ``(through_amplitude, drop_amplitude)`` at phase ``phi``."""
 
         phase = cmath.exp(1j * phi)
-        denominator = (
-            1
-            - self.alpha
-            * self.input_coupler.t.conjugate()
-            * self.output_coupler.t.conjugate()
-            * phase
-        )
+        denominator = self._denominator(phase)
         through = (
             self.input_coupler.t
             - self.alpha * self.output_coupler.t.conjugate() * phase
@@ -115,14 +57,14 @@ class AddDropRing:
         ) / denominator
         return through, drop
 
-    def response(self, phi: float) -> dict[str, PortResponse]:
+    def response(self, phi: float) -> AddDropResponse:
         """Return through/drop responses at round-trip phase ``phi``."""
 
         through, drop = self.amplitudes(phi)
-        return {
-            "through": PortResponse(through),
-            "drop": PortResponse(drop),
-        }
+        return AddDropResponse(
+            through=PortResponse(through),
+            drop=PortResponse(drop),
+        )
 
     def response_for_wavelength(
         self,
@@ -130,7 +72,7 @@ class AddDropRing:
         *,
         n_eff: float,
         length: float,
-    ) -> dict[str, PortResponse]:
+    ) -> AddDropResponse:
         """Return response for a wavelength.
 
         Args:
@@ -160,21 +102,19 @@ class AddDropRing:
             rows.append(
                 {
                     "wavelength": wavelength,
-                    "through_power": response["through"].power,
-                    "through_phase": response["through"].phase,
-                    "drop_power": response["drop"].power,
-                    "drop_phase": response["drop"].phase,
+                    "through_power": response.through.power,
+                    "through_phase": response.through.phase,
+                    "drop_power": response.drop.power,
+                    "drop_phase": response.drop.phase,
                 }
             )
         return rows
 
-
-def round_trip_phase(wavelength: float, *, n_eff: float, length: float) -> float:
-    """Compute ring round-trip phase ``phi = beta L``.
-
-    ``wavelength`` and ``length`` must use the same unit.
-    """
-
-    if wavelength <= 0:
-        raise ValueError("wavelength must be positive")
-    return 2 * math.pi * n_eff * length / wavelength
+    def _denominator(self, phase: complex) -> complex:
+        return (
+            1
+            - self.alpha
+            * self.input_coupler.t.conjugate()
+            * self.output_coupler.t.conjugate()
+            * phase
+        )

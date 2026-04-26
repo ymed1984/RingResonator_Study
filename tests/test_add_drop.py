@@ -2,7 +2,7 @@ import math
 import unittest
 
 from ringresonator_study import AddDropRing, Coupler
-from ringresonator_study.add_drop import round_trip_phase
+from ringresonator_study.phase import round_trip_phase
 
 
 class AddDropRingTest(unittest.TestCase):
@@ -11,6 +11,12 @@ class AddDropRingTest(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             Coupler(t=0.8, kappa=0.7j).validate_lossless()
+
+    def test_lossless_coupler_can_be_built_from_t(self):
+        coupler = Coupler.lossless_from_t(0.8)
+
+        self.assertAlmostEqual(coupler.through_power, 0.64)
+        self.assertAlmostEqual(coupler.cross_power, 0.36)
 
     def test_critical_coupling_suppresses_through_port_on_resonance(self):
         alpha = 0.9
@@ -24,8 +30,8 @@ class AddDropRingTest(unittest.TestCase):
 
         response = ring.response(phi=0.0)
 
-        self.assertAlmostEqual(response["through"].power, 0.0, places=28)
-        self.assertGreater(response["drop"].power, 0.0)
+        self.assertAlmostEqual(response.through.power, 0.0, places=28)
+        self.assertGreater(response.drop.power, 0.0)
 
     def test_symmetric_lossless_add_drop_ring_drops_all_power_on_resonance(self):
         t = 0.9
@@ -37,8 +43,8 @@ class AddDropRingTest(unittest.TestCase):
 
         response = ring.response(phi=0.0)
 
-        self.assertAlmostEqual(response["through"].power, 0.0, places=28)
-        self.assertAlmostEqual(response["drop"].power, 1.0, places=14)
+        self.assertAlmostEqual(response.through.power, 0.0, places=28)
+        self.assertAlmostEqual(response.drop.power, 1.0, places=14)
 
     def test_round_trip_phase_uses_consistent_units(self):
         phase = round_trip_phase(1.55, n_eff=2.4, length=10.0)

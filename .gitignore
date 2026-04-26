@@ -1,6 +1,8 @@
 # Python-generated files
 __pycache__/
 *.py[oc]
+.DS_Store
+.ruff_cache/
 build/
 dist/
 wheels/
@@ -10,3 +12,4 @@ wheels/
 .venv
 
 info/
+output/
