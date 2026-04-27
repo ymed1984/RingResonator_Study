@@ -7,7 +7,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from ringresonator_study import Coupler, SeriesCoupledRings  # noqa: E402
+from ringresonator_study import SeriesCoupledRings  # noqa: E402
 from ringresonator_study.plotting import plot_power_phase_spectrum  # noqa: E402
 
 
@@ -19,18 +19,8 @@ def linspace(start: float, stop: float, count: int) -> list[float]:
 
 
 def main() -> None:
-    model = SeriesCoupledRings.two_ring(
-        input_coupler=Coupler.lossless_from_t(0.95),
-        ring_coupler=Coupler.lossless_from_t(0.90),
-        output_coupler=Coupler.lossless_from_t(0.95),
-        alpha_1=0.98,
-        alpha_2=0.98,
-    )
-    rows = model.spectrum(
-        linspace(1.50, 1.60, 2001),
-        n_effs=(2.4, 2.4),
-        lengths=(30.0, 31.0),
-    )
+    model = SeriesCoupledRings.ansys_nominal_two_ring(tuning_voltage=0.95)
+    rows = model.spectrum(linspace(1.50, 1.60, 3001))
     output_path = plot_power_phase_spectrum(
         rows,
         power_keys={

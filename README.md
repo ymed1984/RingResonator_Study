@@ -12,7 +12,7 @@ ringresonator_study/
   responses.py           複素振幅からpower/phaseを明示する応答型
   models/
     add_drop.py          add-drop型リング共振器の伝達関数
-    series_coupled.py    2段series-coupled ringの伝達関数
+    series_coupled.py    Ansys型CROW/series-coupled ringの伝達関数
     vernier.py           2リングVernier filterの長さ合成と応答
   plotting/
     add_drop.py          add-drop応答のグラフ化
@@ -104,28 +104,27 @@ The graphs are written under `output/`.
 
 ## Series-coupled rings
 
-`SeriesCoupledRings` is currently implemented for two rings. The constructor
-already takes ring couplers and losses as sequences so the model can grow toward
-N-stage transfer matrices later.
+`SeriesCoupledRings` follows the Ansys/Lumerical Tunable CROW Filter structure:
+identical rings are coupled in series, the edge rings couple to bus waveguides by
+`kappa1`, and adjacent rings couple by `kappa2`. The nominal constructor uses
+the example values `kappa1^2 = 0.13`, `kappa2^2 = 0.0047`, `n_eff = 2.566`,
+`n_g = 3.893`, and `FSR = 79.5 GHz`.
 
 ```python
-from ringresonator_study import Coupler, SeriesCoupledRings
+from ringresonator_study import SeriesCoupledRings
 
-model = SeriesCoupledRings.two_ring(
-    input_coupler=Coupler.lossless_from_t(0.95),
-    ring_coupler=Coupler.lossless_from_t(0.90),
-    output_coupler=Coupler.lossless_from_t(0.95),
-    alpha_1=0.98,
-    alpha_2=0.98,
-)
+model = SeriesCoupledRings.ansys_nominal_two_ring(tuning_voltage=0.95)
 
-response = model.response_for_wavelength(
-    1.55,
-    n_effs=(2.4, 2.4),
-    lengths=(30.0, 31.0),
-)
+print(model.design)
+response = model.response_for_wavelength(1.55)
 print(response.drop.power, response.drop.phase)
 ```
+
+Reference note: `info/oe-19-18-17653.pdf` is Liu and Yariv, "Synthesis of
+high-order bandpass filters based on coupled-resonator optical waveguides
+(CROWs)". It is useful for the next step beyond the nominal Ansys CROW model:
+deriving non-uniform coupling coefficients for higher-order Butterworth or Bessel
+CROW filters.
 
 ## Vernier ring
 
