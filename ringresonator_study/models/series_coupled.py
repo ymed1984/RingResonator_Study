@@ -15,8 +15,7 @@ from typing import Iterable, Sequence
 import numpy as np
 
 from ringresonator_study.responses import PortResponse, ThroughDropResponse
-
-SPEED_OF_LIGHT_M_PER_S = 299_792_458.0
+from ringresonator_study.units import SPEED_OF_LIGHT_M_PER_S
 
 
 @dataclass(frozen=True)
