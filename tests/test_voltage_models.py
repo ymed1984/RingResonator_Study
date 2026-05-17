@@ -119,3 +119,33 @@ def test_table_voltage_model_rejects_missing_required_columns():
                 {"voltage": 1.0, "n_eff": 2.399},
             ]
         )
+
+
+def test_table_voltage_model_accepts_aliases_and_capacitance_units():
+    model = TableVoltageOpticalModel(
+        rows=[
+            {"V": 0.0, "neff": 2.4, "loss_dB_per_cm": 2.0, "capacitance_ff": 40.0},
+            {"V": 1.0, "neff": 2.399, "loss_dB_per_cm": 3.0, "capacitance_ff": 20.0},
+        ]
+    )
+
+    state = model.state_for_voltage(0.5, length_um=30.0)
+
+    assert state.n_eff == pytest.approx(2.3995)
+    assert state.loss_db_per_cm == pytest.approx(2.5)
+    assert state.capacitance_f == pytest.approx(30e-15)
+
+
+def test_table_voltage_model_can_extrapolate_when_enabled():
+    model = TableVoltageOpticalModel(
+        rows=[
+            {"voltage": 0.0, "n_eff": 2.4, "loss_db_per_cm": 2.0},
+            {"voltage": 1.0, "n_eff": 2.399, "loss_db_per_cm": 3.0},
+        ],
+        allow_extrapolation=True,
+    )
+
+    state = model.state_for_voltage(2.0, length_um=30.0)
+
+    assert state.n_eff == pytest.approx(2.398)
+    assert state.loss_db_per_cm == pytest.approx(4.0)

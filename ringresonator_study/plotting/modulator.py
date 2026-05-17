@@ -83,6 +83,55 @@ def plot_transfer_curve(
     return output_path
 
 
+def plot_operating_point_heatmap(
+    points: Iterable[object],
+    *,
+    metric: str = "score",
+    output_path: str | Path,
+) -> Path:
+    """Plot an operating-point metric over wavelength and bias voltage."""
+
+    metric_labels = {
+        "score": "Score",
+        "extinction_ratio_db": "Extinction ratio [dB]",
+        "insertion_loss_db": "Insertion loss [dB]",
+        "optical_modulation_amplitude": "OMA",
+    }
+    if metric not in metric_labels:
+        raise ValueError(
+            "metric must be 'score', 'extinction_ratio_db', "
+            "'insertion_loss_db', or 'optical_modulation_amplitude'"
+        )
+
+    points = list(points)
+    if not points:
+        raise ValueError("points must not be empty")
+
+    wavelengths = sorted({_value(point, "wavelength") for point in points})
+    bias_voltages = sorted({_value(point, "bias_voltage") for point in points})
+    values = [[float("nan") for _ in wavelengths] for _ in bias_voltages]
+    wavelength_index = {value: index for index, value in enumerate(wavelengths)}
+    bias_index = {value: index for index, value in enumerate(bias_voltages)}
+    for point in points:
+        row = bias_index[_value(point, "bias_voltage")]
+        column = wavelength_index[_value(point, "wavelength")]
+        values[row][column] = _value(point, metric)
+
+    fig, ax = plt.subplots(figsize=(8.2, 5.2), constrained_layout=True)
+    mesh = ax.pcolormesh(wavelengths, bias_voltages, values, shading="auto")
+    colorbar = fig.colorbar(mesh, ax=ax)
+    colorbar.set_label(metric_labels[metric])
+    ax.set_xlabel("Wavelength [um]")
+    ax.set_ylabel("Bias voltage [V]")
+    ax.set_title(f"Operating point {metric_labels[metric].lower()}")
+
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output_path, dpi=180)
+    plt.close(fig)
+    return output_path
+
+
 def _axis_config(port: str, y_axis: str) -> tuple[str, str]:
     if y_axis == "power":
         return f"{port}_power", f"{port.capitalize()} transmission |E|^2"
@@ -91,3 +140,9 @@ def _axis_config(port: str, y_axis: str) -> tuple[str, str]:
     if y_axis == "phase":
         return f"{port}_phase", f"{port.capitalize()} phase [rad]"
     raise ValueError("y_axis must be 'power', 'db', or 'phase'")
+
+
+def _value(point: object, key: str) -> float:
+    if isinstance(point, dict):
+        return float(point[key])
+    return float(getattr(point, key))

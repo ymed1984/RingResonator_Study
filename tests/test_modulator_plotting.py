@@ -2,7 +2,11 @@ from pathlib import Path
 
 import pytest
 
-from ringresonator_study.plotting import plot_bias_spectra, plot_transfer_curve
+from ringresonator_study.plotting import (
+    plot_bias_spectra,
+    plot_operating_point_heatmap,
+    plot_transfer_curve,
+)
 
 
 def test_plot_bias_spectra_writes_output(tmp_path: Path):
@@ -81,3 +85,29 @@ def test_plot_transfer_curve_writes_output(tmp_path: Path):
 def test_plot_transfer_curve_rejects_unknown_port(tmp_path: Path):
     with pytest.raises(ValueError):
         plot_transfer_curve([], port="monitor", output_path=tmp_path / "transfer.png")
+
+
+def test_plot_operating_point_heatmap_writes_output(tmp_path: Path):
+    points = [
+        {"wavelength": 1.54, "bias_voltage": 0.0, "score": 1.0},
+        {"wavelength": 1.55, "bias_voltage": 0.0, "score": 2.0},
+        {"wavelength": 1.54, "bias_voltage": 1.0, "score": 3.0},
+        {"wavelength": 1.55, "bias_voltage": 1.0, "score": 4.0},
+    ]
+
+    output_path = plot_operating_point_heatmap(
+        points,
+        metric="score",
+        output_path=tmp_path / "heatmap.png",
+    )
+
+    assert output_path.exists()
+
+
+def test_plot_operating_point_heatmap_rejects_unknown_metric(tmp_path: Path):
+    with pytest.raises(ValueError):
+        plot_operating_point_heatmap(
+            [{"wavelength": 1.55, "bias_voltage": 0.0, "score": 1.0}],
+            metric="unknown",
+            output_path=tmp_path / "heatmap.png",
+        )

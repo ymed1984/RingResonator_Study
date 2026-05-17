@@ -83,14 +83,26 @@ class TableVoltageOpticalModel:
     """Voltage model backed by linearly interpolated tabular data."""
 
     rows: tuple[VoltageOpticalState, ...]
+    allow_extrapolation: bool = False
 
-    def __init__(self, rows: list[dict[str, float]] | tuple[dict[str, float], ...]):
+    def __init__(
+        self,
+        rows: list[dict[str, float]] | tuple[dict[str, float], ...],
+        *,
+        allow_extrapolation: bool = False,
+    ):
         states = tuple(_state_from_row(row) for row in rows)
         _validate_table_states(states)
         object.__setattr__(self, "rows", tuple(sorted(states, key=lambda row: row.voltage)))
+        object.__setattr__(self, "allow_extrapolation", allow_extrapolation)
 
     @classmethod
-    def from_csv(cls, path: str | Path) -> "TableVoltageOpticalModel":
+    def from_csv(
+        cls,
+        path: str | Path,
+        *,
+        allow_extrapolation: bool = False,
+    ) -> "TableVoltageOpticalModel":
         """Build a table model from a CSV file."""
 
         with Path(path).open(newline="") as csv_file:
@@ -98,7 +110,7 @@ class TableVoltageOpticalModel:
             if reader.fieldnames is None:
                 raise ValueError("CSV file must include a header row")
             rows = [_parse_csv_row(row) for row in reader]
-        return cls(rows)
+        return cls(rows, allow_extrapolation=allow_extrapolation)
 
     def state_for_voltage(
         self,
@@ -132,7 +144,13 @@ class TableVoltageOpticalModel:
         self,
         voltage: float,
     ) -> tuple[VoltageOpticalState, VoltageOpticalState]:
-        if voltage < self.rows[0].voltage or voltage > self.rows[-1].voltage:
+        if voltage < self.rows[0].voltage:
+            if self.allow_extrapolation:
+                return self.rows[0], self.rows[1]
+            raise ValueError("voltage is outside the table range")
+        if voltage > self.rows[-1].voltage:
+            if self.allow_extrapolation:
+                return self.rows[-2], self.rows[-1]
             raise ValueError("voltage is outside the table range")
 
         for state in self.rows:
@@ -159,6 +177,7 @@ def field_alpha_from_loss_db_per_cm(loss_db_per_cm: float, *, length_um: float) 
 
 
 def _state_from_row(row: dict[str, float]) -> VoltageOpticalState:
+    row = _normalize_voltage_row(row)
     required = {"voltage", "n_eff", "loss_db_per_cm"}
     missing = sorted(required - row.keys())
     if missing:
@@ -188,6 +207,48 @@ def _parse_csv_row(row: dict[str, str | None]) -> dict[str, float]:
         for key, value in row.items()
         if key is not None and value not in {None, ""}
     }
+
+
+def _normalize_voltage_row(row: dict[str, float]) -> dict[str, float]:
+    normalized: dict[str, float] = {}
+    for key, value in row.items():
+        canonical = _canonical_column_name(key)
+        if canonical == "capacitance_ff":
+            normalized["capacitance_f"] = float(value) * 1e-15
+        elif canonical == "capacitance_pf":
+            normalized["capacitance_f"] = float(value) * 1e-12
+        else:
+            normalized[canonical] = float(value)
+    return normalized
+
+
+def _canonical_column_name(name: str) -> str:
+    normalized = name.strip().lower().replace("-", "_")
+    aliases = {
+        "v": "voltage",
+        "voltage_v": "voltage",
+        "bias": "voltage",
+        "bias_voltage": "voltage",
+        "bias_voltage_v": "voltage",
+        "neff": "n_eff",
+        "effective_index": "n_eff",
+        "n_eff_real": "n_eff",
+        "ng": "n_group",
+        "n_g": "n_group",
+        "group_index": "n_group",
+        "loss": "loss_db_per_cm",
+        "loss_db_cm": "loss_db_per_cm",
+        "loss_db_per_cm": "loss_db_per_cm",
+        "loss_db_per_centimeter": "loss_db_per_cm",
+        "loss_db_per_cm_": "loss_db_per_cm",
+        "loss_db_per_cm^-1": "loss_db_per_cm",
+        "capacitance": "capacitance_f",
+        "capacitance_f": "capacitance_f",
+        "capacitance_farad": "capacitance_f",
+        "capacitance_ff": "capacitance_ff",
+        "capacitance_pf": "capacitance_pf",
+    }
+    return aliases.get(normalized, normalized)
 
 
 def _validate_table_states(states: tuple[VoltageOpticalState, ...]) -> None:

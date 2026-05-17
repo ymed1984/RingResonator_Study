@@ -1,6 +1,10 @@
 import pytest
 
-from ringresonator_study.modulation import resonance_shifts, track_resonance
+from ringresonator_study.modulation import (
+    extract_resonance_metrics,
+    resonance_shifts,
+    track_resonance,
+)
 
 
 def test_track_resonance_finds_through_dip_per_voltage():
@@ -74,3 +78,44 @@ def test_track_resonance_rejects_empty_rows():
 def test_track_resonance_rejects_unknown_mode():
     with pytest.raises(ValueError):
         track_resonance([], mode="center")
+
+
+def test_extract_resonance_metrics_for_through_dip():
+    rows = [
+        {"voltage": 0.0, "wavelength": 1.54, "through_power": 1.0},
+        {"voltage": 0.0, "wavelength": 1.55, "through_power": 0.0},
+        {"voltage": 0.0, "wavelength": 1.56, "through_power": 1.0},
+    ]
+
+    metrics = extract_resonance_metrics(rows, port="through", mode="min")
+
+    assert metrics[0]["resonance_wavelength"] == pytest.approx(1.55)
+    assert metrics[0]["linewidth_um"] == pytest.approx(0.01)
+    assert metrics[0]["quality_factor"] == pytest.approx(155.0)
+    assert metrics[0]["contrast_db"] == float("inf")
+
+
+def test_extract_resonance_metrics_for_drop_peak():
+    rows = [
+        {"voltage": 0.0, "wavelength": 1.54, "drop_power": 0.0},
+        {"voltage": 0.0, "wavelength": 1.55, "drop_power": 1.0},
+        {"voltage": 0.0, "wavelength": 1.56, "drop_power": 0.0},
+    ]
+
+    metrics = extract_resonance_metrics(rows, port="drop", mode="max")
+
+    assert metrics[0]["resonance_wavelength"] == pytest.approx(1.55)
+    assert metrics[0]["linewidth_um"] == pytest.approx(0.01)
+    assert metrics[0]["quality_factor"] == pytest.approx(155.0)
+
+
+def test_extract_resonance_metrics_returns_nan_when_half_level_is_not_spanned():
+    rows = [
+        {"voltage": 0.0, "wavelength": 1.54, "through_power": 0.7},
+        {"voltage": 0.0, "wavelength": 1.55, "through_power": 0.0},
+        {"voltage": 0.0, "wavelength": 1.56, "through_power": 0.2},
+    ]
+
+    metrics = extract_resonance_metrics(rows, port="through", mode="min")
+
+    assert metrics[0]["linewidth_um"] != metrics[0]["linewidth_um"]

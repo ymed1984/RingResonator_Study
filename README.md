@@ -107,6 +107,8 @@ uv run python examples/plot_series_coupled.py
 uv run python examples/plot_vernier.py
 uv run python examples/plot_ring_modulator_bias.py
 uv run python examples/plot_ring_modulator_transfer.py
+uv run python examples/plot_operating_point_heatmap.py
+uv run python examples/run_design_sweep.py
 ```
 
 The graphs are written under `output/`.
@@ -235,6 +237,98 @@ from ringresonator_study.units import wavelength_shift_to_frequency_shift_ghz
 shift_ghz = wavelength_shift_to_frequency_shift_ghz(
     center_wavelength_um=1.55,
     delta_wavelength_um=0.001,
+)
+```
+
+CSV export is available for spectra, transfer curves, resonance metrics, and
+operating-point results:
+
+```python
+from ringresonator_study.io import write_csv_rows
+
+write_csv_rows(rows, "output/ring_modulator_bias_spectrum.csv")
+write_csv_rows(transfer_rows, "output/ring_modulator_transfer.csv")
+```
+
+Resonance linewidth, loaded Q, and contrast can be extracted from bias spectra:
+
+```python
+from ringresonator_study.modulation import extract_resonance_metrics
+
+resonance_metrics = extract_resonance_metrics(
+    rows,
+    port="through",
+    mode="min",
+)
+write_csv_rows(resonance_metrics, "output/ring_modulator_resonances.csv")
+```
+
+Operating-point sweeps can be visualized as heatmaps:
+
+```python
+from ringresonator_study.modulation import analyze_operating_points
+from ringresonator_study.plotting import plot_operating_point_heatmap
+
+points = analyze_operating_points(
+    modulator,
+    wavelengths_um=[1.545, 1.550, 1.555],
+    bias_voltages=[0.25, 0.50, 0.75],
+    drive_voltage=0.5,
+)
+
+plot_operating_point_heatmap(
+    points,
+    metric="score",
+    output_path=Path("output/ring_modulator_operating_score.png"),
+)
+```
+
+For simulation handoff, Lumerical-style FDE CSV files can be loaded with common
+column aliases such as `V`, `neff`, `ng`, and `loss_dB_per_cm`:
+
+```python
+from ringresonator_study.io import load_lumerical_fde_voltage_model
+
+voltage_model = load_lumerical_fde_voltage_model(
+    "data/fde_voltage_table.csv",
+    allow_extrapolation=True,
+)
+```
+
+Sentaurus-style capacitance CSV files can be normalized for electrical analysis:
+
+```python
+from ringresonator_study.io import read_sentaurus_capacitance_rows
+from ringresonator_study.modulation import rc_state_for_voltage
+
+capacitance_rows = read_sentaurus_capacitance_rows("data/sentaurus_cv.csv")
+rc_state = rc_state_for_voltage(
+    voltage_model,
+    voltage=0.5,
+    length_um=30.0,
+    resistance_ohm=50.0,
+)
+```
+
+Passive ring design candidates can be swept against the same voltage model:
+
+```python
+from ringresonator_study.modulation import RingDesignCandidate, sweep_ring_designs
+
+results = sweep_ring_designs(
+    voltage_model,
+    [
+        RingDesignCandidate(through_t=0.90, length_um=28.0),
+        RingDesignCandidate(through_t=0.95, length_um=30.0),
+    ],
+    wavelengths_um=[1.545, 1.550, 1.555],
+    bias_voltages=[0.25, 0.50, 0.75],
+    drive_voltage=0.5,
+)
+
+write_csv_rows(
+    [result.as_dict() for result in results],
+    "output/ring_modulator_design_sweep.csv",
 )
 ```
 
