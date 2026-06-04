@@ -164,6 +164,39 @@ class TableVoltageOpticalModel:
         raise ValueError("voltage is outside the table range")
 
 
+def provisional_voltage_rows() -> list[dict[str, float]]:
+    """Return a small placeholder voltage table for interface bring-up."""
+
+    return [
+        {
+            "voltage": 0.0,
+            "n_eff": 2.4,
+            "loss_db_per_cm": 2.0,
+            "n_group": 4.2,
+            "capacitance_f": 35e-15,
+        },
+        {
+            "voltage": 1.0,
+            "n_eff": 2.3995,
+            "loss_db_per_cm": 2.5,
+            "n_group": 4.2,
+            "capacitance_f": 31e-15,
+        },
+    ]
+
+
+def provisional_voltage_model(
+    *,
+    allow_extrapolation: bool = False,
+) -> TableVoltageOpticalModel:
+    """Return a placeholder voltage model when simulator input is unavailable."""
+
+    return TableVoltageOpticalModel(
+        provisional_voltage_rows(),
+        allow_extrapolation=allow_extrapolation,
+    )
+
+
 def field_alpha_from_loss_db_per_cm(loss_db_per_cm: float, *, length_um: float) -> float:
     """Return round-trip field transmission from propagation loss."""
 
@@ -231,13 +264,21 @@ def _canonical_column_name(name: str) -> str:
         "bias_voltage": "voltage",
         "bias_voltage_v": "voltage",
         "neff": "n_eff",
+        "ne": "n_eff",
+        "n_e": "n_eff",
         "effective_index": "n_eff",
+        "effective_index_real": "n_eff",
+        "real_neff": "n_eff",
+        "n_real": "n_eff",
         "n_eff_real": "n_eff",
         "ng": "n_group",
         "n_g": "n_group",
+        "group": "n_group",
         "group_index": "n_group",
+        "group_index_real": "n_group",
         "loss": "loss_db_per_cm",
         "loss_db_cm": "loss_db_per_cm",
+        "loss_db_per_cm_1": "loss_db_per_cm",
         "loss_db_per_cm": "loss_db_per_cm",
         "loss_db_per_centimeter": "loss_db_per_cm",
         "loss_db_per_cm_": "loss_db_per_cm",

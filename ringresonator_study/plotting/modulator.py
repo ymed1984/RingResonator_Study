@@ -7,12 +7,15 @@ from typing import Iterable
 
 import matplotlib.pyplot as plt
 
+from ringresonator_study.units import optical_frequency_hz
+
 
 def plot_bias_spectra(
     rows: Iterable[dict[str, float]],
     *,
     port: str = "through",
     y_axis: str = "db",
+    x_axis: str = "wavelength",
     output_path: str | Path,
 ) -> Path:
     """Plot wavelength spectra overlaid by voltage bias."""
@@ -20,6 +23,7 @@ def plot_bias_spectra(
     if port not in {"through", "drop"}:
         raise ValueError("port must be 'through' or 'drop'")
     y_key, y_label = _axis_config(port, y_axis)
+    x_value, x_label = _spectrum_x_axis_config(x_axis)
 
     rows = list(rows)
     voltages = sorted({row["voltage"] for row in rows})
@@ -27,15 +31,15 @@ def plot_bias_spectra(
     fig, ax = plt.subplots(figsize=(9, 4.8), constrained_layout=True)
     for voltage in voltages:
         voltage_rows = [row for row in rows if row["voltage"] == voltage]
-        voltage_rows.sort(key=lambda row: row["wavelength"])
+        voltage_rows.sort(key=x_value)
         ax.plot(
-            [row["wavelength"] for row in voltage_rows],
+            [x_value(row) for row in voltage_rows],
             [row[y_key] for row in voltage_rows],
             label=f"{voltage:g} V",
             linewidth=1.7,
         )
 
-    ax.set_xlabel("Wavelength [um]")
+    ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
     ax.set_title("Ring modulator bias-dependent spectrum")
     ax.grid(True, alpha=0.3)
@@ -140,6 +144,17 @@ def _axis_config(port: str, y_axis: str) -> tuple[str, str]:
     if y_axis == "phase":
         return f"{port}_phase", f"{port.capitalize()} phase [rad]"
     raise ValueError("y_axis must be 'power', 'db', or 'phase'")
+
+
+def _spectrum_x_axis_config(x_axis: str):
+    if x_axis == "wavelength":
+        return lambda row: row["wavelength"], "Wavelength [um]"
+    if x_axis == "frequency":
+        return (
+            lambda row: optical_frequency_hz(row["wavelength"]) / 1e12,
+            "Optical frequency [THz]",
+        )
+    raise ValueError("x_axis must be 'wavelength' or 'frequency'")
 
 
 def _value(point: object, key: str) -> float:

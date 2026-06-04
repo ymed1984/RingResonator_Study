@@ -136,6 +136,21 @@ def test_table_voltage_model_accepts_aliases_and_capacitance_units():
     assert state.capacitance_f == pytest.approx(30e-15)
 
 
+def test_table_voltage_model_accepts_ne_ng_loss_aliases():
+    model = TableVoltageOpticalModel(
+        rows=[
+            {"bias": 0.0, "ne": 2.4, "ng": 4.0, "loss": 2.0},
+            {"bias": 1.0, "ne": 2.399, "ng": 4.2, "loss": 3.0},
+        ]
+    )
+
+    state = model.state_for_voltage(0.5, length_um=30.0)
+
+    assert state.n_eff == pytest.approx(2.3995)
+    assert state.n_group == pytest.approx(4.1)
+    assert state.loss_db_per_cm == pytest.approx(2.5)
+
+
 def test_table_voltage_model_can_extrapolate_when_enabled():
     model = TableVoltageOpticalModel(
         rows=[

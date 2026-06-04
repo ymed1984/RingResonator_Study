@@ -69,6 +69,27 @@ def test_transfer_curve_returns_one_row_per_voltage():
     assert [row["voltage"] for row in rows] == [0.0, 0.5, 1.0]
 
 
+def test_ring_modulator_combines_intrinsic_and_voltage_alpha():
+    modulator = RingModulator(
+        ring=AddDropRing(
+            input_coupler=Coupler.lossless_from_t(0.95),
+            output_coupler=Coupler.lossless_from_t(0.95),
+            alpha=0.9,
+        ),
+        length_um=30.0,
+        voltage_model=LinearVoltageOpticalModel(
+            n_eff0=2.4,
+            dn_eff_dv=0.0,
+            loss_db_per_cm0=2.0,
+        ),
+    )
+
+    state = modulator.voltage_model.state_for_voltage(0.0, length_um=30.0)
+    rows = modulator.spectrum_for_voltage([1.55], 0.0)
+
+    assert rows[0]["alpha"] == pytest.approx(0.9 * state.alpha)
+
+
 def test_metrics_returns_static_modulation_values():
     modulator = build_modulator()
 

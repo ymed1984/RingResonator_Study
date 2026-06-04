@@ -35,7 +35,7 @@ class RingModulator:
         """Return optical response for one wavelength and voltage bias."""
 
         state = self.voltage_model.state_for_voltage(voltage, length_um=self.length_um)
-        biased_ring = replace(self.ring, alpha=state.alpha)
+        biased_ring = _biased_ring(self.ring, state.alpha)
         return biased_ring.response_for_wavelength(
             wavelength_um,
             n_eff=state.n_eff,
@@ -51,14 +51,14 @@ class RingModulator:
 
         rows: list[dict[str, float]] = []
         state = self.voltage_model.state_for_voltage(voltage, length_um=self.length_um)
-        biased_ring = replace(self.ring, alpha=state.alpha)
+        biased_ring = _biased_ring(self.ring, state.alpha)
         for wavelength_um in wavelengths_um:
             response = biased_ring.response_for_wavelength(
                 wavelength_um,
                 n_eff=state.n_eff,
                 length=self.length_um,
             )
-            rows.append(_response_row(wavelength_um, voltage, response, state.alpha))
+            rows.append(_response_row(wavelength_um, voltage, response, biased_ring.alpha))
         return rows
 
     def transfer_curve(
@@ -76,7 +76,14 @@ class RingModulator:
                 voltage,
                 length_um=self.length_um,
             )
-            rows.append(_response_row(wavelength_um, voltage, response, state.alpha))
+            rows.append(
+                _response_row(
+                    wavelength_um,
+                    voltage,
+                    response,
+                    self.ring.alpha * state.alpha,
+                )
+            )
         return rows
 
     def bias_spectrum(
@@ -136,9 +143,11 @@ def _response_row(
     }
 
 
+def _biased_ring(ring: AddDropRing, voltage_alpha: float) -> AddDropRing:
+    return replace(ring, alpha=ring.alpha * voltage_alpha)
+
+
 def _power_db(power: float) -> float:
-    if power < 0:
-        raise ValueError("power must be non-negative")
     if power == 0:
         return -math.inf
     return 10 * math.log10(power)

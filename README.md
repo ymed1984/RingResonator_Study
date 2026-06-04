@@ -151,12 +151,15 @@ plot_bias_spectra(
     rows,
     port="through",
     y_axis="db",
+    x_axis="wavelength",
     output_path=Path("output/ring_modulator_bias_spectrum.png"),
 )
 ```
 
 The bias spectrum output is tabular, so it can also be passed to pandas or
 exported for comparison with future Lumerical FDE and Sentaurus Device results.
+Use `x_axis="frequency"` to plot the same spectra against optical frequency in
+THz.
 
 Tabular voltage models can be used when voltage-dependent optical parameters
 come from simulation or measurement:
@@ -186,6 +189,18 @@ voltage,n_eff,loss_db_per_cm,n_group,capacitance_f
 0.0,2.4000,2.0,4.2,3.5e-14
 0.5,2.3998,2.2,4.2,3.3e-14
 1.0,2.3995,2.5,4.2,3.1e-14
+```
+
+For carrier-extraction bias studies, a provisional table can make the expected
+trend explicit: increasing reverse bias depletes carriers, so `n_eff` recovers
+upward, free-carrier loss decreases, and `n_group` changes slightly.
+
+```csv
+voltage,n_eff,n_group,loss_db_per_cm,capacitance_f
+0.0,2.3950,4.16,6.0,4.5e-14
+0.5,2.3970,4.18,4.5,3.8e-14
+1.0,2.3990,4.20,3.2,3.2e-14
+1.5,2.4010,4.22,2.4,2.8e-14
 ```
 
 Resonance tracking and fixed-wavelength transfer curves are also available:
@@ -284,7 +299,7 @@ plot_operating_point_heatmap(
 ```
 
 For simulation handoff, Lumerical-style FDE CSV files can be loaded with common
-column aliases such as `V`, `neff`, `ng`, and `loss_dB_per_cm`:
+column aliases such as `V`, `ne`, `neff`, `ng`, `loss`, and `loss_dB_per_cm`:
 
 ```python
 from ringresonator_study.io import load_lumerical_fde_voltage_model
@@ -293,6 +308,13 @@ voltage_model = load_lumerical_fde_voltage_model(
     "data/fde_voltage_table.csv",
     allow_extrapolation=True,
 )
+```
+
+If a direct Lumerical export is not available yet, omit the path to get a small
+provisional voltage model for API bring-up:
+
+```python
+voltage_model = load_lumerical_fde_voltage_model()
 ```
 
 Sentaurus-style capacitance CSV files can be normalized for electrical analysis:
@@ -308,6 +330,113 @@ rc_state = rc_state_for_voltage(
     length_um=30.0,
     resistance_ohm=50.0,
 )
+```
+
+Sentaurus-derived optical tables can also be loaded when they include voltage,
+`ne`, optional `ng`, and loss columns. Capacitance columns can be included in the
+same CSV:
+
+```python
+from ringresonator_study.io import load_sentaurus_voltage_model
+
+voltage_model = load_sentaurus_voltage_model("data/sentaurus_optical_table.csv")
+```
+
+Single-ring modulator design candidates can be ranked with a Python-first design
+API. The score combines extinction ratio, insertion loss, and RC bandwidth when
+the voltage table includes capacitance:
+
+```python
+from ringresonator_study.io import load_lumerical_fde_voltage_model
+from ringresonator_study.modulation import (
+    RingModulatorDesignCandidate,
+    RingModulatorDesignSpec,
+    design_ring_modulator,
+)
+
+voltage_model = load_lumerical_fde_voltage_model("data/fde_voltage_table.csv")
+
+spec = RingModulatorDesignSpec(
+    candidates=[
+        RingModulatorDesignCandidate(input_t=0.90, length_um=28.0),
+        RingModulatorDesignCandidate(input_t=0.92, output_t=0.96, length_um=30.0),
+        RingModulatorDesignCandidate(input_t=0.95, length_um=32.0),
+    ],
+    wavelengths_um=[1.545, 1.550, 1.555],
+    bias_voltages=[0.25, 0.50, 0.75],
+    drive_voltage=0.5,
+    port="through",
+    min_extinction_ratio_db=3.0,
+    max_insertion_loss_db=6.0,
+    min_rc_bandwidth_ghz=20.0,
+)
+
+ranked = design_ring_modulator(voltage_model, spec)
+best = ranked[0]
+
+print(best.candidate, best.best.wavelength, best.best.bias_voltage)
+print(best.score, best.best.extinction_ratio_db, best.rc_bandwidth_ghz)
+```
+
+The same design input can be stored as JSON with the resonator design separated
+from the modulation mechanism:
+
+```json
+{
+  "resonator": {
+    "type": "single_add_drop",
+    "candidates": [
+      {
+        "input_t": 0.88,
+        "output_t": 0.88,
+        "length_um": 30.0,
+        "intrinsic_alpha": 0.98
+      }
+    ]
+  },
+  "modulation": {
+    "mechanism": "carrier_extraction",
+    "voltage_model": {
+      "type": "table",
+      "rows": [
+        {
+          "voltage": 0.0,
+          "n_eff": 2.3950,
+          "n_group": 4.16,
+          "loss_db_per_cm": 6.0,
+          "capacitance_f": 4.5e-14
+        },
+        {
+          "voltage": 1.5,
+          "n_eff": 2.4010,
+          "n_group": 4.22,
+          "loss_db_per_cm": 2.4,
+          "capacitance_f": 2.8e-14
+        }
+      ]
+    }
+  },
+  "sweep": {
+    "wavelengths_um": {"start": 1.50, "stop": 1.60, "count": 401},
+    "bias_voltages": [0.0, 0.5, 1.0, 1.5],
+    "drive_voltage": 0.5,
+    "port": "through"
+  },
+  "constraints": {
+    "max_insertion_loss_db": 6.0,
+    "min_extinction_ratio_db": 3.0
+  }
+}
+```
+
+Load the file and run the same design function:
+
+```python
+from ringresonator_study.io import load_ring_modulator_design_input
+from ringresonator_study.modulation import design_ring_modulator
+
+design_input = load_ring_modulator_design_input("designs/ring_modulator.json")
+ranked = design_ring_modulator(design_input.voltage_model, design_input.spec)
 ```
 
 Passive ring design candidates can be swept against the same voltage model:

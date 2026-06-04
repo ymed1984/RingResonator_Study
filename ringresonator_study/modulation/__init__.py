@@ -1,6 +1,14 @@
 """Voltage-dependent modulation models and metrics."""
 
-from .design_sweep import DesignSweepResult, RingDesignCandidate, sweep_ring_designs
+from .design_sweep import (
+    DesignSweepResult,
+    RingDesignCandidate,
+    RingModulatorDesignCandidate,
+    RingModulatorDesignResult,
+    RingModulatorDesignSpec,
+    design_ring_modulator,
+    sweep_ring_designs,
+)
 from .electrical import (
     RCElectricalState,
     rc_3db_bandwidth_hz,
@@ -27,6 +35,8 @@ from .voltage_models import (
     VoltageOpticalModel,
     VoltageOpticalState,
     field_alpha_from_loss_db_per_cm,
+    provisional_voltage_model,
+    provisional_voltage_rows,
 )
 
 __all__ = [
@@ -37,15 +47,21 @@ __all__ = [
     "RCElectricalState",
     "ResonancePoint",
     "RingDesignCandidate",
+    "RingModulatorDesignCandidate",
+    "RingModulatorDesignResult",
+    "RingModulatorDesignSpec",
     "TableVoltageOpticalModel",
     "VoltageOpticalModel",
     "VoltageOpticalState",
     "analyze_operating_points",
     "calculate_modulation_metrics",
+    "design_ring_modulator",
     "extract_resonance_metrics",
     "field_alpha_from_loss_db_per_cm",
     "find_best_operating_point",
     "rank_operating_points",
+    "provisional_voltage_model",
+    "provisional_voltage_rows",
     "rc_3db_bandwidth_hz",
     "rc_lowpass_magnitude",
     "rc_state_for_voltage",
